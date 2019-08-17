@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>humanoid_control</name>
+  <version>0.0.0</version>
+  <description>The humanoid_control package</description>
+
+  <!-- TODO: Adicionar marcos como autor -->
+  <!-- <author email="jane.doe@example.com">Jane Doe</author> -->
+
+  <!-- TODO: Adicionar marcos como maintainer -->
+  <!-- TODO: Adicionar guilherme como maintainer -->
+  <maintainer email="felipepsaraiva@discente.ufg.br">Felipe P. Saraiva</maintainer>
+
+  <license>MIT</license>
+
+  <url type="repository">https://github.com/PEQUI-MEC/HUMANOID</url>
+
+
+  <!-- The *depend tags are used to specify dependencies -->
+  <!-- Dependencies can be catkin packages or system dependencies -->
+  <!-- Examples: -->
+  <!-- Use depend as a shortcut for packages that are both build and exec dependencies -->
+  <!--   <depend>roscpp</depend> -->
+  <!--   Note that this is equivalent to the following: -->
+  <!--   <build_depend>roscpp</build_depend> -->
+  <!--   <exec_depend>roscpp</exec_depend> -->
+  <!-- Use build_depend for packages you need at compile time: -->
+  <!--   <build_depend>message_generation</build_depend> -->
+  <!-- Use build_export_depend for packages you need in order to build against this package: -->
+  <!--   <build_export_depend>message_generation</build_export_depend> -->
+  <!-- Use buildtool_depend for build tool packages: -->
+  <!--   <buildtool_depend>catkin</buildtool_depend> -->
+  <!-- Use exec_depend for packages you need at runtime: -->
+  <!--   <exec_depend>message_runtime</exec_depend> -->
+  <!-- Use test_depend for packages you need only for testing: -->
+  <!--   <test_depend>gtest</test_depend> -->
+  <!-- Use doc_depend for packages you need only for building documentation: -->
+  <!--   <doc_depend>doxygen</doc_depend> -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python-scipy</exec_depend>
+  <exec_depend>autograd-pip</exec_depend>
+
+
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+
+  </export>
+</package>
