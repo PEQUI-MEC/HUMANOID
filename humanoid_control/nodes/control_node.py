@@ -1,19 +1,32 @@
 #!/usr/bin/env python
 import numpy as np
 import rospy
-from std_msgs.msg import Float32MultiArray, Int16MultiArray
+from std_msgs.msg import Float32MultiArray, Int16MultiArray, String
 import threading
 
 from humanoid_control.control import Control
+from humanoid_control.utils import rad_to_deg
 
 def publish_joint_pos():
-  data = to_deg(control.msg_to_micro).astype(np.int16)
+  data = rad_to_deg(control.angulos[:]).astype(np.int16)
   msg = Int16MultiArray()
   msg.data = data
   joint_pub.publish(msg)
 
-def to_deg(angles):
-  return np.array(angles) * 1800 / np.pi
+def command_callback(msg):
+  cmd = msg.data
+  rospy.loginfo('Received command: ' + cmd)
+  if cmd == 'reset':
+    control.reset()
+  elif cmd == 'walk':
+    if control.manual_mode:
+      control.visao_bola = True
+  elif cmd == 'ready':
+    control.enable = True
+  elif cmd == 'set_mode_manual':
+    control.manual_mode = True
+  elif cmd == 'set_mode_auto':
+    control.manual_mode = False
 
 if __name__ == "__main__":
   rospy.init_node('control_node')
@@ -22,8 +35,9 @@ if __name__ == "__main__":
 
   control = Control(gravity_compensation_enable=True)
 
-  joint_pub = rospy.Publisher('/Bioloid/joint_pos', Int16MultiArray, queue_size=1)
-  rospy.Subscriber('Bioloid/visao_cmd', Float32MultiArray, control.visao_cmd_callback)
+  joint_pub = rospy.Publisher('/PMH/joint_pos', Int16MultiArray, queue_size=1)
+  rospy.Subscriber('PMH/vision_status', Float32MultiArray, control.vision_status_callback)
+  rospy.Subscriber('PMH/control_command', String, command_callback)
 
   control_thread = threading.Thread(target=control.run)
   control_thread.daemon = True
