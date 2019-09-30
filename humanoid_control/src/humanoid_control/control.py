@@ -39,8 +39,8 @@ class Control():
 
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
-		self.a = 10.5
-		self.c = 10.2
+		self.a = 10.3
+		self.c = 9.5
 
 		self.angulos = np.zeros(18)
 		self.fps_count = 0
@@ -68,7 +68,7 @@ class Control():
 		self.robo_pitch = 0
 
 		self.gimbal_yaw = 0
-		self.gimbal_pitch = -45
+		self.gimbal_pitch = 0
 
 		self.robo_yaw_lock = 0
 		self.robo_pitch_lock = 0
@@ -268,7 +268,7 @@ class Control():
 		dQ *= math.sin(self.t_state*math.pi/self.tempoPasso)
 
 		if self.perna:
-			self.angulos[self.RIGHT_ANKLE_PITCH] += dQ[0]
+			self.angulos[self.RIGHT_KNEE] += dQ[0]
 			self.angulos[self.RIGHT_HIP_ROLL] += (dQ[1]*-1)
 		else:
 			self.angulos[self.LEFT_KNEE] += dQ[0]
