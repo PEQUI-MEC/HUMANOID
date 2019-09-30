@@ -37,6 +37,9 @@ class Control():
 		self.deslocamentoYpelvesMAX = deslocamento_ypelves
 		self.deslocamentoZpelvesMAX = deslocamento_zpelves
 
+		self.torsoOffsetMin = 5 * math.pi/180.
+		self.torsoOffsetMax = 13 * math.pi/180.
+
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
 		self.a = 10.3
@@ -649,12 +652,12 @@ class Control():
 		aux2 = ((math.exp(aux) - math.exp(- aux))/(math.exp(aux)+math.exp(-aux)))
 
 		p1 = (self.deslocamentoXpes/2)*aux2
-		pos_pelves[0] = p1
+		pos_pelves[0] = p1 + 1.8
 		pos_pelves[1] += -self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 
 		pos_foot = self.pos_inicial_pelves[:]
 		p2 = (-self.deslocamentoXpes/2)*aux2
-		pos_foot[0] = p2
+		pos_foot[0] = p2 + 1.8
 		pos_foot[1] += self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 		pos_foot[2] = self.altura - self.deslocamentoZpes*math.exp(-(dif_estado**2)/600)
 		return pos_pelves, pos_foot
@@ -748,6 +751,10 @@ class Control():
 
 		data[0] = -data[0]
 		data[4] = -data[4]
+
+		offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX)
+		data[self.RIGHT_HIP_PITCH] += offset
+		data[self.LEFT_HIP_PITCH] += offset
 		self.angulos = data
 
 

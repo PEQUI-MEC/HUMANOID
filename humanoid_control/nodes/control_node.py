@@ -33,7 +33,7 @@ if __name__ == "__main__":
   rospy.loginfo('Pequi Mecanico Humanoid - Control Node')
   rate = rospy.Rate(120)
 
-  control = Control(gravity_compensation_enable=True)
+  control = Control(gravity_compensation_enable=False)
 
   joint_pub = rospy.Publisher('/PMH/joint_pos', Int16MultiArray, queue_size=1)
   rospy.Subscriber('PMH/vision_status', Float32MultiArray, control.vision_status_callback)
