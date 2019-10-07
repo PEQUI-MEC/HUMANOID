@@ -8,11 +8,9 @@ import threading
 import time
 
 from .body_physics import BodyPhysics
+from .utils import sigmoid_deslocada
 
 KP_CONST = 0.3
-
-def sigmoid_deslocada(x, periodo):
-	return 1./(1.+math.exp(-(12./periodo)*(x-(periodo/2.))))
 
 class Control():
 	def __init__(self,
@@ -24,6 +22,9 @@ class Control():
               deslocamento_zpelves=30.,
               gravity_compensation_enable=False):
 		self.state = 'IDLE'
+		self.enable = False
+		self.manual_mode = True
+
 		self.altura = altura_inicial
 		self.pos_inicial_pelves = [0., 1.4, altura_inicial]
 		self.pos_inicial_foot = [0., 1.4, altura_inicial]
@@ -36,12 +37,15 @@ class Control():
 		self.deslocamentoYpelvesMAX = deslocamento_ypelves
 		self.deslocamentoZpelvesMAX = deslocamento_zpelves
 
+		self.torsoOffsetMin = 5 * math.pi/180.
+		self.torsoOffsetMax = 13 * math.pi/180.
+
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
-		self.a = 10.5
-		self.c = 10.2
+		self.a = 10.3
+		self.c = 9.5
 
-		self.msg_to_micro = [0]*20
+		self.angulos = np.zeros(18)
 		self.fps_count = 0
 		self.last_time = 0
 		self.count_frames = 0
@@ -49,6 +53,7 @@ class Control():
 		self.deltaTime = 0
 		self.time_ignore_GC = 0.1 #entre 0 e 1 - porcentagem de tempo para ignorar o gravity compensation
 
+		# TODO: Usar o rospy.Rate para controle do loop
 		self.simTransRate = 1/self.nEstados*self.tempoPasso
 
 		self.tempo_acelerando = 4.
@@ -66,7 +71,7 @@ class Control():
 		self.robo_pitch = 0
 
 		self.gimbal_yaw = 0
-		self.gimbal_pitch = -45
+		self.gimbal_pitch = 0
 
 		self.robo_yaw_lock = 0
 		self.robo_pitch_lock = 0
@@ -92,8 +97,6 @@ class Control():
 
 		# Perna no chão: 1 = direita; 0 = esquerda
 		self.perna = 0
-
-		self.activate = True
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -148,6 +151,12 @@ class Control():
 		self.running = True
 
 
+	def reset(self):
+		self.enable = False
+		self.state = 'IDLE'
+		self.visao_bola = False
+
+
 	def atualiza_fps(self):
 		if self.timer_fps >= 1:
 			self.fps_count = self.count_frames
@@ -171,16 +180,20 @@ class Control():
 	# 		data[2] = flag que indica se está com a bola, usada para setar o
 	#       estado do controle para IDLE ou permitir que o robô ande
 	# '''
-	def visao_cmd_callback(self, msg):
-		visao_msg = msg.data
-		if self.robo_yaw + visao_msg[1] < 0:
-			self.gimbal_yaw = self.robo_yaw + visao_msg[1] + 360
-		elif self.robo_yaw + visao_msg[1] > 360:
-			self.gimbal_yaw = (self.robo_yaw + visao_msg[1])% 360
+	def vision_status_callback(self, msg):
+		if self.manual_mode:
+			return
+
+		(pitch, yaw, bola) = msg.data
+		if self.robo_yaw + yaw < 0:
+			self.gimbal_yaw = self.robo_yaw + yaw + 360
+		elif self.robo_yaw + yaw > 360:
+			self.gimbal_yaw = (self.robo_yaw + yaw)% 360
 		else:
-			self.gimbal_yaw = self.robo_yaw + visao_msg[1]
-		self.gimbal_pitch = visao_msg[0]
-		self.visao_bola = visao_msg[2] != 0.
+			self.gimbal_yaw = self.robo_yaw + yaw
+
+		self.gimbal_pitch = pitch
+		self.visao_bola = bool(bola)
 
 
 	# 	'''
@@ -211,6 +224,8 @@ class Control():
 
 	def classifica_estado(self):
 		if self.state is 'IDLE':
+			if not self.enable:
+				return -1
 			if self.turn90:
 				return 'MARCH'
 			elif self.visao_bola:
@@ -256,11 +271,11 @@ class Control():
 		dQ *= math.sin(self.t_state*math.pi/self.tempoPasso)
 
 		if self.perna:
-			self.msg_to_micro[self.RIGHT_ANKLE_PITCH] += dQ[0]
-			self.msg_to_micro[self.RIGHT_HIP_ROLL] += (dQ[1]*-1)
+			self.angulos[self.RIGHT_KNEE] += dQ[0]
+			self.angulos[self.RIGHT_HIP_ROLL] += (dQ[1]*-1)
 		else:
-			self.msg_to_micro[self.LEFT_KNEE] += dQ[0]
-			self.msg_to_micro[self.LEFT_HIP_ROLL] += dQ[1]
+			self.angulos[self.LEFT_KNEE] += dQ[0]
+			self.angulos[self.LEFT_HIP_ROLL] += dQ[1]
 
 
 	def posiciona_robo(self):
@@ -303,10 +318,9 @@ class Control():
 				elif self.deslocamentoYpelves != 0:
 					self.recuar()
 				else:
-					if self.activate:
-						novo_estado = self.classifica_estado()
-						if novo_estado != -1:
-							self.state = novo_estado
+					novo_estado = self.classifica_estado()
+					if novo_estado != -1:
+						self.state = novo_estado
 			elif self.state is 'WALK':
 				if self.deslocamentoXpes < self.deslocamentoXpesMAX:
 					self.acelera_frente()
@@ -638,12 +652,12 @@ class Control():
 		aux2 = ((math.exp(aux) - math.exp(- aux))/(math.exp(aux)+math.exp(-aux)))
 
 		p1 = (self.deslocamentoXpes/2)*aux2
-		pos_pelves[0] = p1
+		pos_pelves[0] = p1 + 1.8
 		pos_pelves[1] += -self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 
 		pos_foot = self.pos_inicial_pelves[:]
 		p2 = (-self.deslocamentoXpes/2)*aux2
-		pos_foot[0] = p2
+		pos_foot[0] = p2 + 1.8
 		pos_foot[1] += self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 		pos_foot[2] = self.altura - self.deslocamentoZpes*math.exp(-(dif_estado**2)/600)
 		return pos_pelves, pos_foot
@@ -666,7 +680,7 @@ class Control():
 			while(timer < t):
 				timer += self.deltaTime
 				for j in range(len(p_atual)):
-					self.msg_to_micro[j] = m[j]*timer + p_ant[j]
+					self.angulos[j] = m[j]*timer + p_ant[j]
 		self.state = 'IDLE'
 		self.interpolando = False
 
@@ -737,7 +751,11 @@ class Control():
 
 		data[0] = -data[0]
 		data[4] = -data[4]
-		self.msg_to_micro = data
+
+		offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX)
+		data[self.RIGHT_HIP_PITCH] += offset
+		data[self.LEFT_HIP_PITCH] += offset
+		self.angulos = data
 
 
 if __name__ == '__main__':
