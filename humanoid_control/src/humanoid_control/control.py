@@ -12,6 +12,8 @@ from .utils import sigmoid_deslocada
 
 KP_CONST = 0.3
 
+DEG_TO_RAD = math.pi * 180
+
 class Control():
 	def __init__(self,
               altura_inicial=17.,
@@ -686,32 +688,42 @@ class Control():
 
 
 	def atualiza_cinematica(self):
-		x = (self.t_state*125)/self.tempoPasso
+		x = (self.t_state * self.nEstados)/self.tempoPasso
 		pelv_point, foot_point = self.getTragectoryPoint(x)
+		data_pelv = self.footToHip(pelv_point)
+		data_foot = self.footToHip(foot_point)
+		tanh_arg = (2*(x-self.nEstados/2))/50
+		# aux = self.angulo_vira/2 * tgh(tanh_arg)
+		# aux = self.angulo_vira/2.*((np.exp(tanh_arg) - np.exp(-tanh_arg))/(np.exp(tanh_arg)+np.exp(-tanh_arg)))
+
+		aux = self.angulo_vira/2. * math.tanh(tanh_arg)
+
+		angulo_vira_plus_aux = self.angulo_vira/2. + aux
+		angulo_vira_minus_aux = self.angulo_vira/2. - aux
+
 		if self.perna:
 			#CINEMÁTICA INVERSA
-			data_pelv = self.footToHip(pelv_point)
-			data_foot = self.footToHip(foot_point)
+
 
 			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A ESQUERDA
 			if self.rota_dir == 1:
-				data_pelv[5] = self.angulo_vira/2. + self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50)))
-				data_pelv[5] = data_pelv[5] * math.pi/180.
+				data_pelv[5] = angulo_vira_plus_aux
 			elif self.rota_dir == -1:
-				data_pelv[5] = -self.angulo_vira/2. - self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50)))
-				data_pelv[5] = data_pelv[5] * math.pi/180.
+				data_pelv[5] = -angulo_vira_plus_aux
 			else:
 				data_pelv[5] = 0
+			
+			data_pelv[5] = data_pelv[5] * DEG_TO_RAD
 
 			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A DIREITA
 			if self.rota_esq == 2:
-				data_foot[5] = self.angulo_vira - (self.angulo_vira/2. + self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50))))
-				data_foot[5] = data_foot[5] * math.pi/180.
+				data_foot[5] = angulo_vira_minus_aux
 			elif self.rota_esq == -2:
-				data_foot[5] = -self.angulo_vira - (-self.angulo_vira/2. - self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50))))
-				data_foot[5] = data_foot[5] * math.pi/180.
+				data_foot[5] = -angulo_vira_minus_aux
 			else:
 				data_foot[5] = 0
+			
+			data_foot[5] = data_foot[5] * DEG_TO_RAD
 
 			#PÉ DIREITO ESTÁ EM CONTATO COM O CHÃO E PÉ ESQUERDO ESTÁ SE MOVENDO.
 			data = data_pelv + data_foot + [0]*6
@@ -720,28 +732,26 @@ class Control():
 			self.body.set_angles(self.perna, data_pelv, data_foot)
 		else:
 			#CINEMÁTICA INVERSA
-			data_pelv = self.footToHip(pelv_point)
-			data_foot = self.footToHip(foot_point)
 
 			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A ESQUERDA
 			if self.rota_esq == 1:
-				data_pelv[5] =  self.angulo_vira/2. + self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50)))
-				data_pelv[5] = data_pelv[5] * math.pi/180.
+				data_pelv[5] =  angulo_vira_plus_aux
 			elif self.rota_esq == -1:
-				data_pelv[5] =  -self.angulo_vira/2. - self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50)))
-				data_pelv[5] = data_pelv[5] * math.pi/180.
+				data_pelv[5] =  -angulo_vira_plus_aux
 			else:
 				data_pelv[5] = 0
 
+			data_pelv[5] = data_pelv[5] * DEG_TO_RAD
+			
 			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A DIREITA
 			if self.rota_dir == 2:
-				data_foot[5] =  self.angulo_vira - (self.angulo_vira/2. + self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50))))
-				data_foot[5] = data_foot[5] * math.pi/180.
+				data_foot[5] =  angulo_vira_minus_aux
 			elif self.rota_dir == -2:
-				data_foot[5] =  -self.angulo_vira - (-self.angulo_vira/2. - self.angulo_vira/2.*((np.exp((2*(x-self.nEstados/2))/50) - np.exp((2*(x-self.nEstados/2))/-50))/(np.exp((2*(x-self.nEstados/2))/50)+np.exp((2*(x-self.nEstados/2))/-50))))
-				data_foot[5] = data_foot[5] * math.pi/180.
+				data_foot[5] =  -angulo_vira_minus_aux
 			else:
 				data_foot[5] = 0
+			
+			data_foot[5] = data_foot[5] * DEG_TO_RAD
 
 			#PÉ ESQUERDO ESTÁ EM CONTATO COM O CHÃO E PÉ DIREITO ESTÁ SE MOVENDO.
 			data = data_foot + data_pelv + [0]*6
