@@ -10,7 +10,7 @@ import time
 from .body_physics import BodyPhysics
 from .utils import sigmoid_deslocada
 
-KP_CONST = 0.3
+KP_CONST = 1.5
 
 DEG_TO_RAD = math.pi * 180
 
@@ -18,9 +18,9 @@ class Control():
 	def __init__(self,
               altura_inicial=17.,
               tempo_passo=0.3,
-              deslocamento_ypelves=2.,
-              deslocamento_zpes=3.,
-              deslocamento_xpes=1.5,
+              deslocamento_ypelves=1.,
+              deslocamento_zpes=2.5,
+              deslocamento_xpes=2.5,
               deslocamento_zpelves=30.,
               gravity_compensation_enable=False):
 		self.state = 'IDLE'
@@ -28,7 +28,7 @@ class Control():
 		self.manual_mode = True
 
 		self.altura = altura_inicial
-		self.pos_inicial_pelves = [0., 1.4, altura_inicial]
+		self.pos_inicial_pelves = [0., 3., altura_inicial]
 		self.pos_inicial_foot = [0., 1.4, altura_inicial]
 		self.deslocamentoXpes = 0.
 		self.deslocamentoYpelves = 0
@@ -39,8 +39,8 @@ class Control():
 		self.deslocamentoYpelvesMAX = deslocamento_ypelves
 		self.deslocamentoZpelvesMAX = deslocamento_zpelves
 
-		self.torsoOffsetMin = 5 * math.pi/180.
-		self.torsoOffsetMax = 13 * math.pi/180.
+		self.torsoOffsetMin = 8 * math.pi/180.
+		self.torsoOffsetMax = 13. * math.pi/180.
 
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
@@ -274,10 +274,10 @@ class Control():
 
 		if self.perna:
 			self.angulos[self.RIGHT_KNEE] += dQ[0]
-			self.angulos[self.RIGHT_HIP_ROLL] += (dQ[1]*-1)
+			self.angulos[self.RIGHT_HIP_ROLL] -= dQ[1]
 		else:
 			self.angulos[self.LEFT_KNEE] += dQ[0]
-			self.angulos[self.LEFT_HIP_ROLL] += dQ[1]
+			self.angulos[self.LEFT_HIP_ROLL] -= dQ[1]
 
 
 	def posiciona_robo(self):
