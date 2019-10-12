@@ -287,6 +287,8 @@ class Control():
 		else:
 			dir_angle = self.gimbal_yaw - self.robo_yaw
 			esq_angle = 360 - dir_angle
+		# dir_angle =   angulo a virar para a direita  para ajustar ao gimbal
+		# esq_angle = - angulo a virar para a esquerda para ajustar ao gimbal
 		if esq_angle > dir_angle:
 			self.robo_yaw_lock = dir_angle
 		else:
@@ -692,72 +694,35 @@ class Control():
 		pelv_point, foot_point = self.getTragectoryPoint(x)
 		data_pelv = self.footToHip(pelv_point)
 		data_foot = self.footToHip(foot_point)
-		tanh_arg = (2*(x-self.nEstados/2))/50
+		tanh_arg = (x-self.nEstados/2)/25
 		# aux = self.angulo_vira/2 * tgh(tanh_arg)
 		# aux = self.angulo_vira/2.*((np.exp(tanh_arg) - np.exp(-tanh_arg))/(np.exp(tanh_arg)+np.exp(-tanh_arg)))
 
 		aux = self.angulo_vira/2. * math.tanh(tanh_arg)
 
-		angulo_vira_plus_aux = self.angulo_vira/2. + aux
-		angulo_vira_minus_aux = self.angulo_vira/2. - aux
-
+		angulo_vira_plus_aux = self.angulo_vira/2. + aux # [0, self.angulo_vira]
+		angulo_vira_minus_aux = self.angulo_vira/2. - aux # [-self.angulo_vira, 0]
+		# angulo positivo: rotacao p esquerda
+		# rota_dir: rotacao perna direita
+		# rota_esq: rotacao perna esquerda
+		# se perna direita no chao (self.perna = 1):
+			# rota_dir%2 == self.perna -> gira perna direita
+			# rota_esq%2 != self.perna -> gira perna esquerda
+		# se perna esquerda no chao (self.perna = 0):
+			# rota_dir%2 == self.perna -> gira perna direita
+			# rota_dir%2 != self.perna -> girar perna esquerda
 		if self.perna:
-			#CINEMÁTICA INVERSA
-
-
-			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A ESQUERDA
-			if self.rota_dir == 1:
-				data_pelv[5] = angulo_vira_plus_aux
-			elif self.rota_dir == -1:
-				data_pelv[5] = -angulo_vira_plus_aux
-			else:
-				data_pelv[5] = 0
-			
-			data_pelv[5] = data_pelv[5] * DEG_TO_RAD
-
-			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A DIREITA
-			if self.rota_esq == 2:
-				data_foot[5] = angulo_vira_minus_aux
-			elif self.rota_esq == -2:
-				data_foot[5] = -angulo_vira_minus_aux
-			else:
-				data_foot[5] = 0
-			
-			data_foot[5] = data_foot[5] * DEG_TO_RAD
-
-			#PÉ DIREITO ESTÁ EM CONTATO COM O CHÃO E PÉ ESQUERDO ESTÁ SE MOVENDO.
 			data = data_pelv + data_foot + [0]*6
-
-			#CONFIGURA BODY SOLVER PARA INVOCAR FUNÇÕES DO MODELO DINÂMICO DO ROBÔ
-			self.body.set_angles(self.perna, data_pelv, data_foot)
 		else:
-			#CINEMÁTICA INVERSA
-
-			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A ESQUERDA
-			if self.rota_esq == 1:
-				data_pelv[5] =  angulo_vira_plus_aux
-			elif self.rota_esq == -1:
-				data_pelv[5] =  -angulo_vira_plus_aux
-			else:
-				data_pelv[5] = 0
-
-			data_pelv[5] = data_pelv[5] * DEG_TO_RAD
-			
-			#ROTINHA PARA VIRAR/PARAR DE VIRAR PARA A DIREITA
-			if self.rota_dir == 2:
-				data_foot[5] =  angulo_vira_minus_aux
-			elif self.rota_dir == -2:
-				data_foot[5] =  -angulo_vira_minus_aux
-			else:
-				data_foot[5] = 0
-			
-			data_foot[5] = data_foot[5] * DEG_TO_RAD
-
-			#PÉ ESQUERDO ESTÁ EM CONTATO COM O CHÃO E PÉ DIREITO ESTÁ SE MOVENDO.
 			data = data_foot + data_pelv + [0]*6
-
-			#CONFIGURA BODY SOLVER PARA INVOCAR FUNÇÕES DO MODELO DINÂMICO DO ROBÔ
-			self.body.set_angles(self.perna, data_foot, data_pelv)
+		# perna direita
+		if (self.rota_dir != 0) and (self.rota_dir % 2 == self.perna):
+			data[self.RIGHT_HIP_YALL] = copysign(angulo_vira_plus_aux, self.rota_dir) * DEG_TO_RAD
+		if (self.rota_esq != 0) and (self.rota_esq % 2 != self.perna):
+			data[self.LEFT_HIP_YALL] = copysign(angulo_vira_minus_aux, self.rota_esq) * DEG_TO_RAD
+		#CONFIGURA BODY SOLVER PARA INVOCAR FUNÇÕES DO MODELO DINÂMICO DO ROBÔ
+		ref_index = self.perna * 6 # 0 -> perna direita, primeiro; 6 -> perna esquerda primeiro
+		self.body.set_angles(self.perna, data[0+ref_index:6+ref_index], data[6-ref_index:12-ref_index])
 
 		data[0] = -data[0]
 		data[4] = -data[4]
