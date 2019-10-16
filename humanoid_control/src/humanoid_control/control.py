@@ -12,7 +12,7 @@ from .utils import sigmoid_deslocada
 
 KP_CONST = 1.5
 
-DEG_TO_RAD = math.pi * 180
+DEG_TO_RAD = math.pi / 180
 
 class Control():
 	def __init__(self,
@@ -697,11 +697,8 @@ class Control():
 		tanh_arg = (x-self.nEstados/2)/25
 		# aux = self.angulo_vira/2 * tgh(tanh_arg)
 		# aux = self.angulo_vira/2.*((np.exp(tanh_arg) - np.exp(-tanh_arg))/(np.exp(tanh_arg)+np.exp(-tanh_arg)))
+		aux = self.angulo_vira/2. * math.tanh(tanh_arg) # [-self.angulo_vira/2, self.angulo_vira/2]
 
-		aux = self.angulo_vira/2. * math.tanh(tanh_arg)
-
-		angulo_vira_plus_aux = self.angulo_vira/2. + aux # [0, self.angulo_vira]
-		angulo_vira_minus_aux = self.angulo_vira/2. - aux # [-self.angulo_vira, 0]
 		# angulo positivo: rotacao p esquerda
 		# rota_dir: rotacao perna direita
 		# rota_esq: rotacao perna esquerda
@@ -711,17 +708,31 @@ class Control():
 		# se perna esquerda no chao (self.perna = 0):
 			# rota_dir%2 == self.perna -> gira perna direita
 			# rota_dir%2 != self.perna -> girar perna esquerda
+		 # ref_index:  0 -> perna direita, primeiro; 6 -> perna esquerda primeiro
+		angulo_vira_plus_aux = self.angulo_vira/2. + aux # [0, self.angulo_vira]
+		angulo_vira_minus_aux = self.angulo_vira/2. - aux # [self.angulo_vira, 0]
 		if self.perna:
 			data = data_pelv + data_foot + [0]*6
+			ref_index = 0
+			right_leg_angle = angulo_vira_plus_aux
+			left_leg_angle = angulo_vira_minus_aux
 		else:
 			data = data_foot + data_pelv + [0]*6
+			ref_index = 6
+			right_leg_angle = angulo_vira_minus_aux
+			left_leg_angle = angulo_vira_plus_aux
+		# abs(rot_dir) = 1 -> perna direita no chão; abs(rot_dir) = 2 -> perna direita no ar
 		# perna direita
-		if (self.rota_dir != 0) and (self.rota_dir % 2 == self.perna):
-			data[self.RIGHT_HIP_YALL] = copysign(angulo_vira_plus_aux, self.rota_dir) * DEG_TO_RAD
-		if (self.rota_esq != 0) and (self.rota_esq % 2 != self.perna):
-			data[self.LEFT_HIP_YALL] = copysign(angulo_vira_minus_aux, self.rota_esq) * DEG_TO_RAD
+
+		if (self.rota_dir != 0):
+			data[self.RIGHT_HIP_YALL] = math.copysign(right_leg_angle, self.rota_dir) * DEG_TO_RAD
+			# print("angulo_vira_plus_aux", angulo_vira_plus_aux * DEG_TO_RAD)
+		# perna esquerda
+		if (self.rota_esq != 0):
+			if(self.rota_esq % 2 != self.perna):
+				data[self.LEFT_HIP_YALL] = math.copysign(left_leg_angle, self.rota_esq) * DEG_TO_RAD
+			# print("angulo_vira_minus_aux", angulo_vira_minus_aux * DEG_TO_RAD)
 		#CONFIGURA BODY SOLVER PARA INVOCAR FUNÇÕES DO MODELO DINÂMICO DO ROBÔ
-		ref_index = self.perna * 6 # 0 -> perna direita, primeiro; 6 -> perna esquerda primeiro
 		self.body.set_angles(self.perna, data[0+ref_index:6+ref_index], data[6-ref_index:12-ref_index])
 
 		data[0] = -data[0]
