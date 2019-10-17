@@ -86,7 +86,8 @@ class ObjectDetector():
 
     def detect_and_visualize(self, frame, thresh=0.6):
         detection = self.detect(frame)
-        return self.visualize_detection(frame, detection, thresh)
+        img = self.visualize_detection(frame[0], detection, thresh)
+        return img, detection
 
     def getDetectionsCords(self, frame, thresh=0.6):
       pass
