@@ -29,7 +29,6 @@ class Control():
 
 		self.altura = altura_inicial
 		self.pos_inicial_pelves = [0., 3., altura_inicial]
-		self.pos_inicial_foot = [0., 1.4, altura_inicial]
 		self.deslocamentoXpes = 0.
 		self.deslocamentoYpelves = 0
 		self.deslocamentoZpes = 0
@@ -39,8 +38,9 @@ class Control():
 		self.deslocamentoYpelvesMAX = deslocamento_ypelves
 		self.deslocamentoZpelvesMAX = deslocamento_zpelves
 
-		self.torsoOffsetMin = 8 * math.pi/180.
-		self.torsoOffsetMax = 13. * math.pi/180.
+		self.hipPointOffset = 1.5
+		self.torsoOffsetMin = 6.5 * math.pi/180.
+		self.torsoOffsetMax = 11. * math.pi/180.
 
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
@@ -298,7 +298,6 @@ class Control():
 
 
 	def run(self):
-		timer_main_loop = 0
 		self.perna = 0 # perna direita(1) ou esquerda(0) no chão
 
 		while (self.running):
@@ -376,7 +375,6 @@ class Control():
 			self.atualiza_cinematica()
 			self.gravity_compensation()
 			self.posiciona_robo()
-			timer_main_loop += self.deltaTime
 			time.sleep(self.simTransRate)
 
 
@@ -656,12 +654,12 @@ class Control():
 		aux2 = ((math.exp(aux) - math.exp(- aux))/(math.exp(aux)+math.exp(-aux)))
 
 		p1 = (self.deslocamentoXpes/2)*aux2
-		pos_pelves[0] = p1 + 1.8
+		pos_pelves[0] = p1 + self.hipPointOffset
 		pos_pelves[1] += -self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 
 		pos_foot = self.pos_inicial_pelves[:]
 		p2 = (-self.deslocamentoXpes/2)*aux2
-		pos_foot[0] = p2 + 1.8
+		pos_foot[0] = p2 + self.hipPointOffset
 		pos_foot[1] += self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 		pos_foot[2] = self.altura - self.deslocamentoZpes*math.exp(-(dif_estado**2)/600)
 		return pos_pelves, pos_foot
@@ -738,7 +736,7 @@ class Control():
 		data[0] = -data[0]
 		data[4] = -data[4]
 
-		offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX)
+		offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX - 0.2*(self.deslocamentoXpes/self.deslocamentoXpesMAX))
 		data[self.RIGHT_HIP_PITCH] += offset
 		data[self.LEFT_HIP_PITCH] += offset
 		self.angulos = data
