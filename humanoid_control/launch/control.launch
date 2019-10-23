@@ -4,7 +4,12 @@
 
   <node name="control" pkg="humanoid_control" type="control_node.py" respawn="true" output="screen" launch-prefix="$(find humanoid_control)/scripts/virtualenvw.sh $(arg venv)" />
   <node name="control_serial" pkg="rosserial_python" type="serial_node.py" respawn="true" respawn_delay="2">
-    <param name="port" value="/dev/ttyACM0" /> <!-- TODO: Mudar para porta fixa -->
-    <param name="baud" type="string" value="500000" />
+    <param name="port" value="/dev/ttyACM0"/> <!-- TODO: Mudar para porta fixa -->
+    <param name="baud" type="string" value="500000"/>
+  </node>
+
+  <node ns="/PMH/imu" name="imu_node" pkg="imu_bno055" type="bno055_i2c_node" respawn="true" respawn_delay="2">
+    <param name="device" value="/dev/i2c-1"/>
+    <param name="address" value="41"/>
   </node>
 </launch>
