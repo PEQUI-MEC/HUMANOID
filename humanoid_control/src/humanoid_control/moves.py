@@ -9,7 +9,7 @@ moves_dir = path.join(rospack.get_path('humanoid_control'), 'moves')
 
 
 def get_path_to_move(name):
-  return path.join(moves_dir, name)
+  return path.join(moves_dir, name + '.csv')
 
 
 def load_move(path):

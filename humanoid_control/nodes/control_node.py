@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from imu_bno055.msg import EulerAngles
 import numpy as np
 import rospy
 from std_msgs.msg import Float32MultiArray, Int16MultiArray, String, UInt8MultiArray
@@ -52,6 +53,10 @@ def command_callback(msg):
     control.manual_mode = False
 
 
+def imu_callback(msg):
+  control.update_robot_orientation(msg.angles.x, msg.angles.y, msg.angles.z)
+
+
 if __name__ == "__main__":
   rospy.init_node('control_node')
   rospy.loginfo('Pequi Mecanico Humanoid - Control Node')
@@ -64,6 +69,8 @@ if __name__ == "__main__":
   interpolation_pub = rospy.Publisher('/PMH/interpolation_pos', Int16MultiArray, queue_size=1)
   rospy.Subscriber('PMH/vision_status', Float32MultiArray, control.vision_status_callback)
   rospy.Subscriber('PMH/control_command', String, command_callback)
+
+  rospy.Subscriber('PMH/imu/euler_angles', EulerAngles, imu_callback)
 
   control_thread = threading.Thread(target=control.run)
   control_thread.daemon = True

@@ -43,6 +43,7 @@
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python-scipy</exec_depend>
   <exec_depend>autograd-pip</exec_depend>
+  <exec_depend>imu_bno055</exec_depend>
 
 
 
