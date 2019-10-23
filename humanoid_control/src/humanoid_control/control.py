@@ -3,6 +3,7 @@ from functools import reduce
 import math
 import numpy as np
 import rospy
+from simple_pid import PID
 from time import time, sleep
 
 from .body_physics import BodyPhysics
@@ -12,13 +13,14 @@ from .utils import sigmoid_deslocada
 KP_CONST = 1.5
 
 DEG_TO_RAD = math.pi / 180
+RAD_TO_DEG = 180 / math.pi
 
 class Control():
 	def __init__(self,
               altura_inicial=17.,
               tempo_passo=0.3,
               deslocamento_ypelves=1.,
-              deslocamento_zpes=2.5,
+              deslocamento_zpes=3.,
               deslocamento_xpes=2.5,
               deslocamento_zpelves=30.,
               gravity_compensation_enable=False):
@@ -54,11 +56,14 @@ class Control():
 
 		self.max_yaw = 20
 		self.min_yaw = 5
+		self.fall_treshold = 65
 
 		self.gravity_compensation_enable = gravity_compensation_enable
 		self.Lfoot_press = [0,0,0,0]
 		self.Rfoot_press = [0,0,0,0]
 		self.total_press = 0
+
+		self.torso_offset_pid = PID(1, 0.002, 0.005, setpoint=0, sample_time=0.01, output_limits=(-10, 10))
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -181,13 +186,13 @@ class Control():
 		self.total_press = np.sum(self.Lfoot_press)+np.sum(self.Rfoot_press)
 
 
-	# 	Leitura IMU - robo
-	def robot_inertial_callback(self, msg):
-		self.robo_yaw = msg.data[2]
-		self.robo_pitch = msg.data[1]
-		self.robo_roll = msg.data[0]
+	def update_robot_orientation(self, roll, pitch, yaw):
+		self.robo_roll = roll
+		self.robo_pitch = pitch
+		self.robo_yaw = yaw
 
-		if (abs(self.robo_pitch) > 45 or abs(self.robo_roll) > 45) and not self.state == 'INTERPOLATE':
+		is_fallen = (abs(roll) > 45 or abs(pitch) > 45)
+		if is_fallen and not self.state == 'INTERPOLATE':
 			self.state = 'FALLEN'
 
 
@@ -269,7 +274,12 @@ class Control():
 
 		while (self.running):
 			if self.state is 'FALLEN':
-				self.interpolation = get_move_generator(get_path_to_move('up_front.csv'))
+				if self.robo_pitch <= self.fall_treshold:
+					move = 'up_front'
+				elif self.robo_pitch >= self.fall_treshold:
+					move = 'turn'
+
+				self.interpolation = get_move_generator(get_path_to_move(move))
 				self.state = 'INTERPOLATE'
 			elif self.state is 'MARCH':
 				if self.deslocamentoYpelves != self.deslocamentoYpelvesMAX:
@@ -670,7 +680,8 @@ class Control():
 		data[0] = -data[0]
 		data[4] = -data[4]
 
-		offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX - 0.2*(self.deslocamentoXpes/self.deslocamentoXpesMAX))
+		# offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX - 0.2*(self.deslocamentoXpes/self.deslocamentoXpesMAX))
+		offset = self.torso_offset_pid(-self.robo_pitch) * DEG_TO_RAD
 		data[self.RIGHT_HIP_PITCH] += offset
 		data[self.LEFT_HIP_PITCH] += offset
 		self.angulos = data
