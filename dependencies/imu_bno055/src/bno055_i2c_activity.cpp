@@ -83,7 +83,7 @@ bool BNO055I2CActivity::reset() {
     _i2c_smbus_write_byte_data(file, BNO055_SYS_TRIGGER_ADDR, 0);
     ros::Duration(0.025).sleep();
 
-    _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, BNO055_OPERATION_MODE_NDOF);
+    _i2c_smbus_write_byte_data(file, BNO055_OPR_MODE_ADDR, BNO055_OPERATION_MODE_IMUPLUS);
     ros::Duration(0.025).sleep();
 
     return true;
@@ -99,6 +99,7 @@ bool BNO055I2CActivity::start() {
     if(!pub_mag) pub_mag = nh.advertise<sensor_msgs::MagneticField>("mag", 1);
     if(!pub_temp) pub_temp = nh.advertise<sensor_msgs::Temperature>("temp", 1);
     if(!pub_status) pub_status = nh.advertise<diagnostic_msgs::DiagnosticStatus>("status", 1);
+    if(!pub_angles) pub_angles = nh.advertise<imu_bno055::EulerAngles>("euler_angles", 1);
 
     if(!service_calibrate) service_calibrate = nh.advertiseService(
         "calibrate",
@@ -205,10 +206,19 @@ bool BNO055I2CActivity::spinOnce() {
     msg_temp.header.seq = seq;
     msg_temp.temperature = (double)record.temperature;
 
+    EulerAngles msg_angles;
+    msg_angles.header.stamp = time;
+    msg_angles.header.frame_id = param_frame_id;
+    msg_angles.header.seq = seq;
+    msg_angles.angles.x = record.fused_pitch / 16.0;
+    msg_angles.angles.y = record.fused_roll / 16.0;
+    msg_angles.angles.z = record.fused_heading / 16.0;
+
     pub_data.publish(msg_data);
     pub_raw.publish(msg_raw);
     pub_mag.publish(msg_mag);
     pub_temp.publish(msg_temp);
+    pub_angles.publish(msg_angles);
 
     if(seq % 50 == 0) {
         current_status.values[DIAG_CALIB_STAT].value = std::to_string(record.calibration_status);
@@ -220,7 +230,7 @@ bool BNO055I2CActivity::spinOnce() {
         pub_status.publish(current_status);
     }
 
-    return true;    
+    return true;
 }
 
 bool BNO055I2CActivity::stop() {
@@ -231,6 +241,7 @@ bool BNO055I2CActivity::stop() {
     if(pub_mag) pub_mag.shutdown();
     if(pub_temp) pub_temp.shutdown();
     if(pub_status) pub_status.shutdown();
+    if(pub_angles) pub_angles.shutdown();
 
     if(service_calibrate) service_calibrate.shutdown();
     if(service_reset) service_reset.shutdown();

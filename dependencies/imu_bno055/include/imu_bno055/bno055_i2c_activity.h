@@ -16,6 +16,7 @@
 #include <diagnostic_msgs/DiagnosticStatus.h>
 #include <diagnostic_msgs/DiagnosticArray.h>
 #include <diagnostic_msgs/KeyValue.h>
+#include <imu_bno055/EulerAngles.h>
 
 #include <linux/i2c-dev.h>
 #include <smbus_functions.h>
@@ -265,6 +266,7 @@ class BNO055I2CActivity {
     ros::Publisher pub_mag;
     ros::Publisher pub_temp;
     ros::Publisher pub_status;
+    ros::Publisher pub_angles;
 
     // ROS subscribers
     ros::ServiceServer service_calibrate;
