@@ -63,7 +63,8 @@ class Control():
 		self.Rfoot_press = [0,0,0,0]
 		self.total_press = 0
 
-		self.torso_offset_pid = PID(1, 0.002, 0.005, setpoint=0, sample_time=0.01, output_limits=(-10, 10))
+		self.torso_pitch_offset_pid = PID(1, 0.002, 0.005, setpoint=0, sample_time=0.01, output_limits=(-25, 25))
+		self.torso_roll_offset_pid = PID(1, 0.002, 0.005, setpoint=0, sample_time=0.01, output_limits=(-10, 10))
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -681,9 +682,13 @@ class Control():
 		data[4] = -data[4]
 
 		# offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX - 0.2*(self.deslocamentoXpes/self.deslocamentoXpesMAX))
-		offset = self.torso_offset_pid(-self.robo_pitch) * DEG_TO_RAD
-		data[self.RIGHT_HIP_PITCH] += offset
-		data[self.LEFT_HIP_PITCH] += offset
+		offset_pitch = self.torso_pitch_offset_pid(-self.robo_pitch) * DEG_TO_RAD
+		data[self.RIGHT_HIP_PITCH] += offset_pitch
+		data[self.LEFT_HIP_PITCH] += offset_pitch
+
+		offset_roll = self.torso_roll_offset_pid(-self.robo_roll) * DEG_TO_RAD
+		data[self.RIGHT_HIP_ROLL] += offset_roll
+		data[self.LEFT_HIP_ROLL] += offset_roll
 		self.angulos = data
 
 
