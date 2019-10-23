@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-import csv
 from functools import reduce
 import math
 import numpy as np
 import rospy
-import threading
-import time
+from time import time, sleep
 
 from .body_physics import BodyPhysics
+from .moves import get_path_to_move, get_move_generator
 from .utils import sigmoid_deslocada
 
 KP_CONST = 1.5
@@ -23,16 +22,11 @@ class Control():
               deslocamento_xpes=2.5,
               deslocamento_zpelves=30.,
               gravity_compensation_enable=False):
-		self.state = 'IDLE'
-		self.enable = False
+		self.reset()
 		self.manual_mode = True
 
 		self.altura = altura_inicial
 		self.pos_inicial_pelves = [0., 3., altura_inicial]
-		self.deslocamentoXpes = 0.
-		self.deslocamentoYpelves = 0
-		self.deslocamentoZpes = 0
-		self.deslocamentoZpelves = 0
 		self.deslocamentoXpesMAX = deslocamento_xpes
 		self.deslocamentoZpesMAX = deslocamento_zpes
 		self.deslocamentoYpelvesMAX = deslocamento_ypelves
@@ -48,11 +42,7 @@ class Control():
 		self.c = 9.5
 
 		self.angulos = np.zeros(18)
-		self.fps_count = 0
-		self.last_time = 0
-		self.count_frames = 0
-		self.timer_fps = 0
-		self.deltaTime = 0
+		self.angulo_vira = 3
 		self.time_ignore_GC = 0.1 #entre 0 e 1 - porcentagem de tempo para ignorar o gravity compensation
 
 		# TODO: Usar o rospy.Rate para controle do loop
@@ -62,43 +52,13 @@ class Control():
 		self.tempo_marchando = 4.
 		self.tempo_virando = 3.
 
-		self.visao_search = False
-		self.visao_bola = False
-		self.turn90 = False
 		self.max_yaw = 20
 		self.min_yaw = 5
 
-		self.robo_roll = 0
-		self.robo_yaw = 0
-		self.robo_pitch = 0
-
-		self.gimbal_yaw = 0
-		self.gimbal_pitch = 0
-
-		self.robo_yaw_lock = 0
-		self.robo_pitch_lock = 0
 		self.gravity_compensation_enable = gravity_compensation_enable
 		self.Lfoot_press = [0,0,0,0]
 		self.Rfoot_press = [0,0,0,0]
 		self.total_press = 0
-
-		self.t_state = 0
-		self.rot_desvio = 0
-		self.rota_dir = 0
-		self.rota_esq = 0
-		self.angulo_vira = 3
-
-		self.marchando = False
-		self.recuando = False
-		self.acelerando = False
-		self.freando = False
-		self.ladeando = False
-		self.desladeando = False
-		self.interpolando = False
-		self.posicionando = False
-
-		# Perna no chão: 1 = direita; 0 = esquerda
-		self.perna = 0
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -121,34 +81,14 @@ class Control():
 		self.RIGHT_ARM_ROLL = 17
 
 		self.state_encoder = {
-			"IDLE" : 1,
-			"MARCH" : 2,
-			"WALK"  : 3,
-			"TURN"  : 4,
-			"FALLEN": 5,
-			"UP"    : 6,
-			"PENALIZED": 7,
-			"TURN90": 8
+			'IDLE': 1,
+			'MARCH': 2,
+			'WALK': 3,
+			'TURN': 4,
+			'INTERPOLATE': 5,
+			'FALLEN': 6,
+			'TURN90': 7
 		}
-
-		try:
-			with open ('estados_levanta_frente.csv', newline='') as csvfile:
-				tabela = list(csv.reader(csvfile, delimiter=','))
-				tabela = np.array(tabela)
-				self.estados_levanta_frente = tabela[1:, :]
-				self.tempos_levanta_frente = [4]*19
-
-			with open('estados_levanta_back.csv', newline='') as csvfile2:
-				tabela = list(csv.reader(csvfile2, delimiter=','))
-				tabela = np.array(tabela)
-				self.estados_levanta_costas = tabela[1:, :]
-				self.tempos_levanta_costas = [4]*19
-		except Exception:
-			rospy.logerr('Não foi possível carregar os arquivos CSV')
-			self.estados_levanta_costas = []
-			self.tempos_levanta_costas = []
-			self.estados_levanta_frente = []
-			self.tempos_levanta_frente = []
 
 		self.running = True
 
@@ -156,20 +96,47 @@ class Control():
 	def reset(self):
 		self.enable = False
 		self.state = 'IDLE'
+
+		self.deslocamentoXpes = 0.
+		self.deslocamentoYpelves = 0
+		self.deslocamentoZpes = 0
+		self.deslocamentoZpelves = 0
+
+		self.visao_search = False
 		self.visao_bola = False
+		self.turn90 = False
+		self.gimbal_yaw = 0
+		self.gimbal_pitch = 0
+
+		self.robo_roll = 0
+		self.robo_yaw = 0
+		self.robo_pitch = 0
+		self.robo_yaw_lock = 0
+		self.robo_pitch_lock = 0
+
+		self.t_state = 0
+		self.rot_desvio = 0
+		self.rota_dir = 0
+		self.rota_esq = 0
+
+		self.marchando = False
+		self.recuando = False
+		self.acelerando = False
+		self.freando = False
+		self.ladeando = False
+		self.desladeando = False
+		self.posicionando = False
+
+		self.perna = 0
+		self.interpolation = get_move_generator([])
+
+		self.last_time = time()
+		self.deltaTime = 0
 
 
-	def atualiza_fps(self):
-		if self.timer_fps >= 1:
-			self.fps_count = self.count_frames
-			self.count_frames = 0
-			self.timer_fps = 0
-			return self.fps_count
-		self.deltaTime = time.time() - self.last_time
-		self.last_time = time.time()
-		self.count_frames += 1
-		self.timer_fps += self.deltaTime
-		return None
+	def atualiza_tempo(self):
+		self.deltaTime = time() - self.last_time
+		self.last_time = time()
 
 
 	# '''
@@ -220,7 +187,7 @@ class Control():
 		self.robo_pitch = msg.data[1]
 		self.robo_roll = msg.data[0]
 
-		if (abs(self.robo_pitch) > 45 or abs(self.robo_roll) > 45) and not self.interpolando:
+		if (abs(self.robo_pitch) > 45 or abs(self.robo_roll) > 45) and not self.state == 'INTERPOLATE':
 			self.state = 'FALLEN'
 
 
@@ -301,9 +268,9 @@ class Control():
 		self.perna = 0 # perna direita(1) ou esquerda(0) no chão
 
 		while (self.running):
-			if (self.state is 'FALLEN'):
-				if not self.interpolando:
-					self.levanta()
+			if self.state is 'FALLEN':
+				self.interpolation = get_move_generator(get_path_to_move('up_front.csv'))
+				self.state = 'INTERPOLATE'
 			elif self.state is 'MARCH':
 				if self.deslocamentoYpelves != self.deslocamentoYpelvesMAX:
 					self.marchar()
@@ -370,12 +337,14 @@ class Control():
 				elif self.deslocamentoYpelves != 0:
 					self.recuar()
 
-			self.atualiza_fps()
-			self.atualiza_estado()
-			self.atualiza_cinematica()
-			self.gravity_compensation()
+			if self.state != 'INTERPOLATE':
+				self.atualiza_tempo()
+				self.atualiza_estado()
+				self.atualiza_cinematica()
+				self.gravity_compensation()
+
 			self.posiciona_robo()
-			time.sleep(self.simTransRate)
+			sleep(self.simTransRate)
 
 
 	# Anda de lado para alinhar com o gol
@@ -407,19 +376,6 @@ class Control():
 					self.desanda_de_lado_esquerda()
 				if self.pos_inicial_pelves[1] < 0 and self.perna:
 					self.desanda_de_lado_direita()
-
-
-	def levanta(self):
-		if not self.interpolando:
-			self.interpolando = True
-			if (self.robo_pitch >0):
-				t = threading.Thread(target=self.interpola_estados, args=[self.estados_levanta_frente, self.tempos_levanta_frente])
-				t.daemon = True
-				t.start()
-			else:
-				t = threading.Thread(target=self.interpola_estados, args=[self.estados_levanta_costas, self.tempos_levanta_costas])
-				t.daemon = True
-				t.start()
 
 
 	def anda_de_lado_esquerda(self):
@@ -663,28 +619,6 @@ class Control():
 		pos_foot[1] += self.deslocamentoYpelves*math.sin(x*math.pi/self.nEstados)
 		pos_foot[2] = self.altura - self.deslocamentoZpes*math.exp(-(dif_estado**2)/600)
 		return pos_pelves, pos_foot
-
-
-	# interpolação simples entre estados
-	def interpola_estados(self, estados, tempos):
-		if len(estados) > 0:
-			p_ant = estados[0]
-		else:
-			return
-		for i in range(1, len(estados)):
-			p_atual = estados[i]
-			t = tempos[i-1]
-			timer = 0
-			m = []
-			for j in range(len(p_atual)):
-				m.append((p_ant[j] - p_atual[j])/(0 - t))
-
-			while(timer < t):
-				timer += self.deltaTime
-				for j in range(len(p_atual)):
-					self.angulos[j] = m[j]*timer + p_ant[j]
-		self.state = 'IDLE'
-		self.interpolando = False
 
 
 	def atualiza_cinematica(self):

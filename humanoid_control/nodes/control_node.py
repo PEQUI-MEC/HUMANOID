@@ -24,10 +24,23 @@ def publish_control_status():
   status_pub.publish(msg)
 
 
+def publish_interpolation_pos():
+  msg = Int16MultiArray()
+  try:
+    msg.data = np.array(next(control.interpolation), dtype=np.int16)
+  except StopIteration:
+    msg.data = [0]
+    control.reset()
+  interpolation_pub.publish(msg)
+
+
 def command_callback(msg):
   cmd = msg.data
-  if cmd == 'reset':
-    rospy.signal_shutdown('reset')
+  if cmd == 'next_interpolation':
+    publish_interpolation_pos()
+  elif cmd == 'reset':
+    # rospy.signal_shutdown('reset')
+    control.reset()
   elif cmd == 'walk':
     if control.manual_mode:
       control.visao_bola = True
@@ -48,6 +61,7 @@ if __name__ == "__main__":
 
   joint_pub = rospy.Publisher('/PMH/joint_pos', Int16MultiArray, queue_size=1)
   status_pub = rospy.Publisher('/PMH/control_status', UInt8MultiArray, queue_size=1)
+  interpolation_pub = rospy.Publisher('/PMH/interpolation_pos', Int16MultiArray, queue_size=1)
   rospy.Subscriber('PMH/vision_status', Float32MultiArray, control.vision_status_callback)
   rospy.Subscriber('PMH/control_command', String, command_callback)
 
