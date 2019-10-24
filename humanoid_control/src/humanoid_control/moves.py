@@ -26,7 +26,7 @@ def get_move_generator(source):
 			with open(source, newline='') as file:
 				table = csv.reader(file, delimiter=',')
 				for state in table:
-					yield state
+					yield state[1:]
 		else:
 			for state in source:
-				yield state
+				yield state[1:]

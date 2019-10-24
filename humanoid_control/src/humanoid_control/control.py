@@ -20,7 +20,7 @@ class Control():
               altura_inicial=17.,
               tempo_passo=0.3,
               deslocamento_ypelves=1.,
-              deslocamento_zpes=3.,
+              deslocamento_zpes=3.5,
               deslocamento_xpes=2.5,
               deslocamento_zpelves=30.,
               gravity_compensation_enable=False):
@@ -34,9 +34,9 @@ class Control():
 		self.deslocamentoYpelvesMAX = deslocamento_ypelves
 		self.deslocamentoZpelvesMAX = deslocamento_zpelves
 
-		self.hipPointOffset = 1.5
-		self.torsoOffsetMin = 6.5 * math.pi/180.
-		self.torsoOffsetMax = 11. * math.pi/180.
+		self.hipPointOffset = 1.6
+		self.torsoOffsetMin = 8. * math.pi/180.
+		self.torsoOffsetMax = 16.5 * math.pi/180.
 
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
@@ -63,7 +63,7 @@ class Control():
 		self.Rfoot_press = [0,0,0,0]
 		self.total_press = 0
 
-		self.torso_pitch_offset_pid = PID(2, 0.004, 0.02, setpoint=0, sample_time=0.01, output_limits=(-25, 25))
+		self.torso_pitch_offset_pid = PID(.5, 0.001, 0.0025, setpoint=20, sample_time=0.01, output_limits=(-25, 25))
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -274,12 +274,13 @@ class Control():
 
 		while (self.running):
 			if self.state is 'FALLEN':
+				move = 'turn'
 				if self.robo_pitch <= -self.fall_treshold:
 					move = 'up_front'
 				elif self.robo_pitch >= self.fall_treshold:
 					move = 'turn'
 
-				if move:
+				if move is not None:
 					self.interpolation = get_move_generator(get_path_to_move(move))
 				else:
 					self.interpolation = get_move_generator([])
@@ -684,8 +685,8 @@ class Control():
 		data[0] = -data[0]
 		data[4] = -data[4]
 
-		# offset = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX - 0.2*(self.deslocamentoXpes/self.deslocamentoXpesMAX))
-		offset_pitch = self.torso_pitch_offset_pid(-self.robo_pitch) * DEG_TO_RAD
+		offset_pitch = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX)
+		# offset_pitch = self.torso_pitch_offset_pid(-self.robo_pitch) * DEG_TO_RAD
 		data[self.RIGHT_HIP_PITCH] += offset_pitch
 		data[self.LEFT_HIP_PITCH] += offset_pitch
 		self.angulos = data
