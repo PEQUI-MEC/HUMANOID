@@ -63,8 +63,7 @@ class Control():
 		self.Rfoot_press = [0,0,0,0]
 		self.total_press = 0
 
-		self.torso_pitch_offset_pid = PID(1, 0.002, 0.005, setpoint=0, sample_time=0.01, output_limits=(-25, 25))
-		self.torso_roll_offset_pid = PID(1, 0.002, 0.005, setpoint=0, sample_time=0.01, output_limits=(-10, 10))
+		self.torso_pitch_offset_pid = PID(2, 0.004, 0.02, setpoint=0, sample_time=0.01, output_limits=(-25, 25))
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -192,7 +191,7 @@ class Control():
 		self.robo_pitch = pitch
 		self.robo_yaw = yaw
 
-		is_fallen = (abs(roll) > 45 or abs(pitch) > 45)
+		is_fallen = (abs(roll) > self.fall_treshold or abs(pitch) > self.fall_treshold)
 		if is_fallen and not self.state == 'INTERPOLATE':
 			self.state = 'FALLEN'
 
@@ -275,12 +274,16 @@ class Control():
 
 		while (self.running):
 			if self.state is 'FALLEN':
-				if self.robo_pitch <= self.fall_treshold:
+				if self.robo_pitch <= -self.fall_treshold:
 					move = 'up_front'
 				elif self.robo_pitch >= self.fall_treshold:
 					move = 'turn'
 
-				self.interpolation = get_move_generator(get_path_to_move(move))
+				if move:
+					self.interpolation = get_move_generator(get_path_to_move(move))
+				else:
+					self.interpolation = get_move_generator([])
+
 				self.state = 'INTERPOLATE'
 			elif self.state is 'MARCH':
 				if self.deslocamentoYpelves != self.deslocamentoYpelvesMAX:
@@ -685,10 +688,6 @@ class Control():
 		offset_pitch = self.torso_pitch_offset_pid(-self.robo_pitch) * DEG_TO_RAD
 		data[self.RIGHT_HIP_PITCH] += offset_pitch
 		data[self.LEFT_HIP_PITCH] += offset_pitch
-
-		offset_roll = self.torso_roll_offset_pid(-self.robo_roll) * DEG_TO_RAD
-		data[self.RIGHT_HIP_ROLL] += offset_roll
-		data[self.LEFT_HIP_ROLL] += offset_roll
 		self.angulos = data
 
 
