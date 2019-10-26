@@ -2,10 +2,11 @@
 from imu_bno055.msg import EulerAngles
 import numpy as np
 import rospy
-from std_msgs.msg import Float32MultiArray, Int16MultiArray, String, UInt8MultiArray
+from std_msgs.msg import Empty, Float32MultiArray, Int16MultiArray, String, UInt8MultiArray
 import threading
 
 from humanoid_control.control import Control
+from humanoid_control.moves import get_path_to_move, get_move_generator
 from humanoid_control.utils import rad_to_deg
 
 STATUS_RATE_DIVIDER = 24
@@ -36,7 +37,10 @@ def publish_interpolation_pos():
 
 
 def command_callback(msg):
-  cmd = msg.data
+  split = msg.data.split(' ')
+  cmd = split[0]
+  args = split[1:]
+
   if cmd == 'next_interpolation':
     publish_interpolation_pos()
   elif cmd == 'reset':
@@ -51,10 +55,22 @@ def command_callback(msg):
     control.manual_mode = True
   elif cmd == 'set_mode_auto':
     control.manual_mode = False
+  elif cmd == 'move':
+    control.interpolation = get_move_generator(get_path_to_move(args[0]))
+    control.state = 'INTERPOLATE'
+  elif cmd == 'defend':
+    defend_pub.publish(Empty())
 
 
 def imu_callback(msg):
   control.update_robot_orientation(msg.angles.x, msg.angles.y, msg.angles.z)
+
+
+def defend_callback(msg):
+  rospy.loginfo(msg.data)
+  move = ('defend_left' if msg.data == 'LEFT' else 'defend_right')
+  control.interpolation = get_move_generator(get_path_to_move(move))
+  control.state = 'INTERPOLATE'
 
 
 if __name__ == "__main__":
@@ -67,10 +83,12 @@ if __name__ == "__main__":
   joint_pub = rospy.Publisher('/PMH/joint_pos', Int16MultiArray, queue_size=1)
   status_pub = rospy.Publisher('/PMH/control_status', UInt8MultiArray, queue_size=1)
   interpolation_pub = rospy.Publisher('/PMH/interpolation_pos', Int16MultiArray, queue_size=1)
+  defend_pub = rospy.Publisher('/PMH/defend', Empty, queue_size=1)
+
   rospy.Subscriber('PMH/vision_status', Float32MultiArray, control.vision_status_callback)
   rospy.Subscriber('PMH/control_command', String, command_callback)
-
   rospy.Subscriber('PMH/imu/euler_angles', EulerAngles, imu_callback)
+  rospy.Subscriber('PMH/defend/result', String, defend_callback)
 
   control_thread = threading.Thread(target=control.run)
   control_thread.daemon = True

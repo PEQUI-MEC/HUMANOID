@@ -18,13 +18,12 @@ RAD_TO_DEG = 180 / math.pi
 class Control():
 	def __init__(self,
               altura_inicial=17.,
-              tempo_passo=0.3,
-              deslocamento_ypelves=1.,
-              deslocamento_zpes=3.5,
-              deslocamento_xpes=2.5,
+              tempo_passo=0.25,
+              deslocamento_ypelves=0.05,
+              deslocamento_zpes=3.,
+              deslocamento_xpes=2.,
               deslocamento_zpelves=30.,
               gravity_compensation_enable=False):
-		self.reset()
 		self.manual_mode = True
 
 		self.altura = altura_inicial
@@ -36,7 +35,7 @@ class Control():
 
 		self.hipPointOffset = 1.6
 		self.torsoOffsetMin = 8. * math.pi/180.
-		self.torsoOffsetMax = 16.5 * math.pi/180.
+		self.torsoOffsetMax = 15. * math.pi/180.
 
 		self.nEstados = 125
 		self.tempoPasso = tempo_passo
@@ -63,7 +62,7 @@ class Control():
 		self.Rfoot_press = [0,0,0,0]
 		self.total_press = 0
 
-		self.torso_pitch_offset_pid = PID(.5, 0.001, 0.0025, setpoint=20, sample_time=0.01, output_limits=(-25, 25))
+		self.torso_pitch_offset_pid = PID(.8, 0.001, 0.0025, setpoint=10, sample_time=0.01, output_limits=(0, 50))
 
 		self.body = BodyPhysics()
 		self.RIGHT_ANKLE_ROLL = 0
@@ -95,6 +94,8 @@ class Control():
 			'TURN90': 7
 		}
 
+		self.visao_bola = False
+		self.reset()
 		self.running = True
 
 
@@ -108,7 +109,7 @@ class Control():
 		self.deslocamentoZpelves = 0
 
 		self.visao_search = False
-		self.visao_bola = False
+		self.visao_bola = (self.visao_bola if self.manual_mode else False)
 		self.turn90 = False
 		self.gimbal_yaw = 0
 		self.gimbal_pitch = 0
@@ -216,14 +217,14 @@ class Control():
 				return 'TURN90'
 			elif not self.visao_bola:
 				return 'IDLE'
-			elif self.visao_bola and abs(self.robo_yaw_lock) > self.max_yaw:
-				return 'TURN'
+			# elif self.visao_bola and abs(self.robo_yaw_lock) > self.max_yaw:
+			# 	return 'TURN'
 			elif self.visao_bola and self.robo_pitch_lock > -45:
 				return 'WALK'
 			else:
 				return -1
 		elif self.state is 'WALK':
-			if not self.visao_bola or abs(self.robo_yaw_lock) > self.max_yaw or self.robo_pitch_lock <= -45:
+			if not self.visao_bola:# or abs(self.robo_yaw_lock) > self.max_yaw or self.robo_pitch_lock <= -45:
 				return 'MARCH'
 			else:
 				return -1
@@ -274,7 +275,7 @@ class Control():
 
 		while (self.running):
 			if self.state is 'FALLEN':
-				move = 'turn'
+				move = None
 				if self.robo_pitch <= -self.fall_treshold:
 					move = 'up_front'
 				elif self.robo_pitch >= self.fall_treshold:
@@ -685,10 +686,13 @@ class Control():
 		data[0] = -data[0]
 		data[4] = -data[4]
 
-		offset_pitch = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX)
-		# offset_pitch = self.torso_pitch_offset_pid(-self.robo_pitch) * DEG_TO_RAD
+		# offset_pitch = self.torsoOffsetMin + (self.torsoOffsetMax - self.torsoOffsetMin) * (self.deslocamentoYpelves/self.deslocamentoYpelvesMAX)
+		offset_pitch = self.torso_pitch_offset_pid(-self.robo_pitch) * DEG_TO_RAD
 		data[self.RIGHT_HIP_PITCH] += offset_pitch
 		data[self.LEFT_HIP_PITCH] += offset_pitch
+
+		data[self.RIGHT_ANKLE_ROLL] += (1.5 * DEG_TO_RAD)
+		data[self.LEFT_ANKLE_ROLL] += (-1.5 * DEG_TO_RAD)
 		self.angulos = data
 
 
