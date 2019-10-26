@@ -72,6 +72,7 @@ def frame_callback(msg):
     #rospy.loginfo(frame.shape)
     if(defend_flag):
         if(detection_count < 10):
+            print("Running network")
             height, width, dim = frame.shape
             frame_expanded = np.expand_dims(frame, axis=0)
             (boxes, scores, classes, num) = detector.detect(frame_expanded)
@@ -117,21 +118,24 @@ def frame_callback(msg):
                 for i,(new,old) in enumerate(zip(good_new,good_old)):
                     a,b = new.ravel()
                     c,d = old.ravel()
-                    mask = cv2.line(mask, (a,b),(c,d), color[i].tolist(), 2)
-                    frame = cv2.circle(frame,(a,b),5,color[i].tolist(),-1)
+                    #mask = cv2.line(mask, (a,b),(c,d), color[i].tolist(), 2)
+                    #frame = cv2.circle(frame,(a,b),5,color[i].tolist(),-1)
                 dist = 0
                 for i,(new,old) in enumerate(zip(good_new,init_p0)):
                     a,b = new.ravel()
                     c,d = old.ravel()
+                    frame = cv2.line(frame, (a,b),(c,d), color[i].tolist(), 2)
                     dist += (math.sqrt((c-a)**2 + (d-b)**2)*(1 if c-a > 0 else -1))/len(good_new)
-                frame = cv2.add(frame,mask)
+                #frame = cv2.add(frame,mask)
                 print(dist)
                 if(abs(dist) > 70):
                     msg = String()
                     msg.data = "RIGHT" if dist < 0 else "LEFT"
+                    print(msg.data)
                     defend_pub.publish(msg)
                     p0 = None
                     detection_count = 0
+                    good_new = None
                     dist = 0
                     defend_flag = False
             """
