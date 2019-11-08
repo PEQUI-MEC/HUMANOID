@@ -152,8 +152,12 @@ def frame_callback(msg):
             prev_gray = gray.copy()
 
 def defend_callback(msg):
-    global defend_flag
+    global defend_flag, p0, detection_count, good_new, dist
     defend_flag = True
+    p0 = None
+    detection_count = 0
+    good_new = None
+    dist = 0
 
 if __name__ == '__main__':
     rospy.init_node('ball_detection')
